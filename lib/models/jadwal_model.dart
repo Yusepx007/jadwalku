@@ -24,8 +24,7 @@ class Jadwal {
   });
 
   Map<String, dynamic> toMap() {
-    return {
-      'id': id,
+    final map = <String, dynamic>{
       'mata_kuliah': mataKuliah,
       'dosen': dosen,
       'ruangan': ruangan,
@@ -36,6 +35,8 @@ class Jadwal {
       'warna': warna,
       'aktif_notif': aktifNotif ? 1 : 0,
     };
+    if (id != null) map['id'] = id;
+    return map;
   }
 
   factory Jadwal.fromMap(Map<String, dynamic> map) {

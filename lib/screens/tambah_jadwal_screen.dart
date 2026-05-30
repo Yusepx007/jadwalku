@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../database/database_helper.dart';
 import '../models/jadwal_model.dart';
 import '../utils/constants.dart';
+import '../utils/notification_helper.dart';
 
 class TambahJadwalScreen extends StatefulWidget {
   final Jadwal? jadwal;
@@ -98,10 +99,26 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
       aktifNotif: _aktifNotif,
     );
 
-    if (_isEdit) {
-      await _db.updateJadwal(jadwal);
-    } else {
-      await _db.insertJadwal(jadwal);
+    try {
+      if (_isEdit) {
+        await _db.updateJadwal(jadwal);
+        // Batalkan notifikasi lama lalu jadwalkan ulang jika perlu
+        if (jadwal.id != null) {
+          await NotificationHelper.cancelNotification(jadwal.id!);
+        }
+        if (_aktifNotif) {
+          await NotificationHelper.scheduleWeeklyNotification(jadwal);
+        }
+      } else {
+        final newId = await _db.insertJadwal(jadwal);
+        // Jadwalkan notifikasi dengan id yang baru
+        if (_aktifNotif) {
+          final jadwalWithId = jadwal.copyWith(id: newId);
+          await NotificationHelper.scheduleWeeklyNotification(jadwalWithId);
+        }
+      }
+    } catch (_) {
+      // Notifikasi gagal tidak boleh crash app
     }
 
     setState(() => _isLoading = false);
@@ -550,6 +567,12 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
             activeTrackColor: AppColors.primary,
             inactiveThumbColor: AppColors.textHint,
             inactiveTrackColor: AppColors.bgSurface,
+            overlayColor: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.pressed)) {
+                return AppColors.primary.withAlpha(30);
+              }
+              return Colors.transparent;
+            }),
           ),
         ],
       ),
@@ -573,34 +596,48 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
             ),
           ],
         ),
-        child: ElevatedButton(
-          onPressed: _isLoading ? null : _save,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          ),
-          child: _isLoading
-              ? const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2.5),
-                )
-              : Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(_isEdit ? Icons.save_rounded : Icons.add_circle_rounded,
-                        color: Colors.black, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      _isEdit ? 'Simpan Perubahan' : 'Tambah Jadwal',
-                      style: GoogleFonts.poppins(
-                          color: Colors.black,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15),
-                    ),
-                  ],
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _isLoading ? null : _save,
+              splashColor: Colors.white.withAlpha(40),
+              highlightColor: Colors.white.withAlpha(20),
+              child: SizedBox(
+                height: 56,
+                child: Center(
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                              color: Colors.black, strokeWidth: 2.5),
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              _isEdit
+                                  ? Icons.save_rounded
+                                  : Icons.add_circle_rounded,
+                              color: Colors.black,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _isEdit ? 'Simpan Perubahan' : 'Tambah Jadwal',
+                              style: GoogleFonts.poppins(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15),
+                            ),
+                          ],
+                        ),
                 ),
+              ),
+            ),
+          ),
         ),
       ),
     );

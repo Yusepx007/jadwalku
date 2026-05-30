@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../database/database_helper.dart';
 import '../models/jadwal_model.dart';
 import '../utils/constants.dart';
+import '../utils/notification_helper.dart';
 import '../widgets/jadwal_card.dart';
 import 'tambah_jadwal_screen.dart';
 
@@ -82,6 +83,12 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> _deleteJadwal(Jadwal jadwal) async {
     await _db.deleteJadwal(jadwal.id!);
+    // Batalkan notifikasi terjadwal untuk jadwal yang dihapus
+    if (jadwal.id != null) {
+      try {
+        await NotificationHelper.cancelNotification(jadwal.id!);
+      } catch (_) {}
+    }
     _loadJadwal();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -105,6 +112,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     super.dispose();
   }
@@ -362,21 +370,38 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         ],
       ),
-      child: FloatingActionButton.extended(
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const TambahJadwalScreen()),
-          );
-          _loadJadwal();
-        },
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        icon: const Icon(Icons.add_rounded, color: Colors.black, size: 22),
-        label: Text(
-          'Tambah Jadwal',
-          style: GoogleFonts.poppins(
-              color: Colors.black, fontWeight: FontWeight.w700, fontSize: 14),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TambahJadwalScreen()),
+              );
+              _loadJadwal();
+            },
+            splashColor: Colors.white.withAlpha(40),
+            highlightColor: Colors.white.withAlpha(20),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.add_rounded, color: Colors.black, size: 22),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Tambah Jadwal',
+                    style: GoogleFonts.poppins(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
