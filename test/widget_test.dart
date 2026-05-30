@@ -10,11 +10,10 @@ void main() {
 
     await tester.pumpWidget(const JadwalKuApp());
     expect(find.byType(JadwalKuApp), findsOneWidget);
+    
     // Pump the 3.2 second splash screen delay timer
     await tester.pump(const Duration(milliseconds: 3200));
     // Settle transitions and load home screen
     await tester.pumpAndSettle();
   });
 }
-
-
