@@ -20,6 +20,7 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
   late TextEditingController _matkulCtrl;
   late TextEditingController _dosenCtrl;
   late TextEditingController _ruanganCtrl;
+  late TextEditingController _pengingatCtrl;
 
   String _selectedHari = 'Senin';
   String _selectedSemester = 'Semester 1';
@@ -27,6 +28,7 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
   TimeOfDay _jamMulai = const TimeOfDay(hour: 8, minute: 0);
   TimeOfDay _jamSelesai = const TimeOfDay(hour: 9, minute: 40);
   bool _aktifNotif = true;
+  int _pengingatMenit = 15;
   bool _isLoading = false;
 
   bool get _isEdit => widget.jadwal != null;
@@ -38,6 +40,8 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
     _matkulCtrl = TextEditingController(text: j?.mataKuliah ?? '');
     _dosenCtrl = TextEditingController(text: j?.dosen ?? '');
     _ruanganCtrl = TextEditingController(text: j?.ruangan ?? '');
+    _pengingatMenit = j?.pengingatMenit ?? 15;
+    _pengingatCtrl = TextEditingController(text: _pengingatMenit.toString());
     if (j != null) {
       _selectedHari = j.hari;
       _selectedSemester = j.semester;
@@ -55,6 +59,7 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
     _matkulCtrl.dispose();
     _dosenCtrl.dispose();
     _ruanganCtrl.dispose();
+    _pengingatCtrl.dispose();
     super.dispose();
   }
 
@@ -86,6 +91,8 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
+    final menitVal = int.tryParse(_pengingatCtrl.text.trim()) ?? 15;
+
     final jadwal = Jadwal(
       id: widget.jadwal?.id,
       mataKuliah: _matkulCtrl.text.trim(),
@@ -97,6 +104,7 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
       semester: _selectedSemester,
       warna: _selectedWarna,
       aktifNotif: _aktifNotif,
+      pengingatMenit: menitVal,
     );
 
     try {
@@ -127,6 +135,62 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
 
   Color _hexToColor(String hex) {
     return Color(int.parse('FF${hex.replaceAll('#', '')}', radix: 16));
+  }
+
+  Future<void> _delete() async {
+    if (widget.jadwal?.id == null) return;
+    setState(() => _isLoading = true);
+    try {
+      await _db.deleteJadwal(widget.jadwal!.id!);
+      await NotificationHelper.cancelNotification(widget.jadwal!.id!);
+    } catch (_) {}
+    setState(() => _isLoading = false);
+    if (mounted) {
+      Navigator.pop(context);
+    }
+  }
+
+  void _showDeleteConfirmDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: AppColors.primary.withAlpha(40)),
+        ),
+        title: Text('Hapus Jadwal?',
+            style: GoogleFonts.poppins(
+                color: AppColors.textPrimary, fontWeight: FontWeight.w700)),
+        content: Text(
+          'Jadwal "${widget.jadwal?.mataKuliah}" akan dihapus permanen.',
+          style: GoogleFonts.poppins(
+              color: AppColors.textSecondary, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Batal',
+                style: GoogleFonts.poppins(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _delete();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent.withAlpha(200),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
+            ),
+            child: Text('Hapus',
+                style: GoogleFonts.poppins(
+                    color: Colors.white, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -237,6 +301,23 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
                   fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600),
             ),
           ),
+          if (_isEdit) ...[
+            const SizedBox(width: 10),
+            GestureDetector(
+              onTap: _showDeleteConfirmDialog,
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2A1A1A),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.redAccent.withAlpha(80)),
+                ),
+                child: const Icon(Icons.delete_outline_rounded,
+                    size: 20, color: Colors.redAccent),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -516,6 +597,20 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
     );
   }
 
+  String get _pengingatText {
+    final text = _pengingatCtrl.text.trim();
+    if (text.isEmpty) return 'Tentukan waktu pengingat';
+    final val = int.tryParse(text);
+    if (val == null || val < 0) return 'Input menit tidak valid';
+    if (val == 0) return 'Tepat waktu saat kuliah dimulai';
+    if (val == 60) return '1 jam sebelum kuliah dimulai';
+    if (val % 60 == 0) {
+      final jam = val ~/ 60;
+      return '$jam jam sebelum kuliah dimulai';
+    }
+    return '$val menit sebelum kuliah dimulai';
+  }
+
   Widget _buildNotifToggle() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -527,53 +622,122 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
           width: 1,
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: _aktifNotif
-                  ? AppColors.primary.withAlpha(30)
-                  : AppColors.textHint.withAlpha(20),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              _aktifNotif ? Icons.notifications_active_rounded : Icons.notifications_off_rounded,
-              color: _aktifNotif ? AppColors.primary : AppColors.textHint,
-              size: 22,
-            ),
+          Row(
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: _aktifNotif
+                      ? AppColors.primary.withAlpha(30)
+                      : AppColors.textHint.withAlpha(20),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  _aktifNotif
+                      ? Icons.notifications_active_rounded
+                      : Icons.notifications_off_rounded,
+                  color: _aktifNotif ? AppColors.primary : AppColors.textHint,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Pengingat Notifikasi',
+                        style: GoogleFonts.poppins(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14)),
+                    Text(_pengingatText,
+                        style: GoogleFonts.poppins(
+                            color: AppColors.textHint, fontSize: 11)),
+                  ],
+                ),
+              ),
+              Switch(
+                value: _aktifNotif,
+                onChanged: (v) => setState(() => _aktifNotif = v),
+                activeThumbColor: Colors.black,
+                activeTrackColor: AppColors.primary,
+                inactiveThumbColor: AppColors.textHint,
+                inactiveTrackColor: AppColors.bgSurface,
+                overlayColor: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.pressed)) {
+                    return AppColors.primary.withAlpha(30);
+                  }
+                  return Colors.transparent;
+                }),
+              ),
+            ],
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Pengingat Notifikasi',
-                    style: GoogleFonts.poppins(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14)),
-                Text('15 menit sebelum kuliah dimulai',
-                    style: GoogleFonts.poppins(
-                        color: AppColors.textHint, fontSize: 11)),
-              ],
+          if (_aktifNotif) ...[
+            const SizedBox(height: 16),
+            Container(
+              height: 1,
+              color: AppColors.primary.withAlpha(30),
             ),
-          ),
-          Switch(
-            value: _aktifNotif,
-            onChanged: (v) => setState(() => _aktifNotif = v),
-            activeThumbColor: Colors.black,
-            activeTrackColor: AppColors.primary,
-            inactiveThumbColor: AppColors.textHint,
-            inactiveTrackColor: AppColors.bgSurface,
-            overlayColor: WidgetStateProperty.resolveWith((states) {
-              if (states.contains(WidgetState.pressed)) {
-                return AppColors.primary.withAlpha(30);
-              }
-              return Colors.transparent;
-            }),
-          ),
+            const SizedBox(height: 16),
+            Text(
+              'Waktu Pengingat (Menit Sebelum Mulai):',
+              style: GoogleFonts.poppins(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _pengingatCtrl,
+              keyboardType: TextInputType.number,
+              style: GoogleFonts.poppins(color: AppColors.textPrimary, fontSize: 14),
+              onChanged: (val) {
+                final n = int.tryParse(val.trim());
+                if (n != null && n >= 0) {
+                  setState(() {
+                    _pengingatMenit = n;
+                  });
+                } else {
+                  setState(() {});
+                }
+              },
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) return 'Wajib diisi';
+                final n = int.tryParse(v.trim());
+                if (n == null || n < 0) return 'Masukkan angka menit yang valid';
+                return null;
+              },
+              decoration: InputDecoration(
+                hintText: 'Contoh: 15',
+                hintStyle: GoogleFonts.poppins(color: AppColors.textHint, fontSize: 13),
+                prefixIcon: const Icon(Icons.timer_outlined, color: AppColors.primary, size: 20),
+                filled: true,
+                fillColor: AppColors.bgCardLight,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: AppColors.primary.withAlpha(20), width: 1),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+            ),
+          ],
         ],
       ),
     );

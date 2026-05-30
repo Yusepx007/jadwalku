@@ -89,7 +89,7 @@ class JadwalCard extends StatelessWidget {
                       children: [
                         // Header row
                         Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Expanded(
                               child: Text(
@@ -122,6 +122,72 @@ class JadwalCard extends StatelessWidget {
                                   color: hariColor,
                                 ),
                               ),
+                            ),
+                            const SizedBox(width: 4),
+                            // Menu Tiga Titik untuk Edit & Hapus
+                            PopupMenuButton<String>(
+                              onSelected: (value) {
+                                if (value == 'edit') {
+                                  onEdit();
+                                } else if (value == 'delete') {
+                                  _showDeleteDialog(context);
+                                }
+                              },
+                              icon: const Icon(
+                                Icons.more_vert_rounded,
+                                color: AppColors.textSecondary,
+                                size: 20,
+                              ),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 100),
+                              color: AppColors.bgCardLight,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(
+                                  color: AppColors.primary.withAlpha(40),
+                                  width: 1,
+                                ),
+                              ),
+                              itemBuilder: (context) => [
+                                PopupMenuItem(
+                                  value: 'edit',
+                                  height: 38,
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.edit_rounded,
+                                          color: AppColors.primary, size: 16),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Edit',
+                                        style: GoogleFonts.poppins(
+                                          color: AppColors.textPrimary,
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem(
+                                  value: 'delete',
+                                  height: 38,
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.delete_rounded,
+                                          color: Colors.redAccent, size: 16),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Hapus',
+                                        style: GoogleFonts.poppins(
+                                          color: Colors.redAccent,
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),

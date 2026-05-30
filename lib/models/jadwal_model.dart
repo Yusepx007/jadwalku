@@ -9,6 +9,7 @@ class Jadwal {
   String semester;
   String warna; // hex color string
   bool aktifNotif;
+  int pengingatMenit;
 
   Jadwal({
     this.id,
@@ -21,6 +22,7 @@ class Jadwal {
     required this.semester,
     this.warna = '#6C63FF',
     this.aktifNotif = true,
+    this.pengingatMenit = 15,
   });
 
   Map<String, dynamic> toMap() {
@@ -34,6 +36,7 @@ class Jadwal {
       'semester': semester,
       'warna': warna,
       'aktif_notif': aktifNotif ? 1 : 0,
+      'pengingat_menit': pengingatMenit,
     };
     if (id != null) map['id'] = id;
     return map;
@@ -51,6 +54,7 @@ class Jadwal {
       semester: map['semester'],
       warna: map['warna'] ?? '#6C63FF',
       aktifNotif: map['aktif_notif'] == 1,
+      pengingatMenit: map['pengingat_menit'] ?? 15,
     );
   }
 
@@ -65,6 +69,7 @@ class Jadwal {
     String? semester,
     String? warna,
     bool? aktifNotif,
+    int? pengingatMenit,
   }) {
     return Jadwal(
       id: id ?? this.id,
@@ -77,6 +82,7 @@ class Jadwal {
       semester: semester ?? this.semester,
       warna: warna ?? this.warna,
       aktifNotif: aktifNotif ?? this.aktifNotif,
+      pengingatMenit: pengingatMenit ?? this.pengingatMenit,
     );
   }
 }

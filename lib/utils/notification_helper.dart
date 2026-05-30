@@ -44,40 +44,42 @@ class NotificationHelper {
     final hour = int.tryParse(timeParts[0]) ?? 0;
     final minute = int.tryParse(timeParts[1]) ?? 0;
 
-    // 15 menit sebelum kuliah
-    int reminderMinute = minute - 15;
-    int reminderHour = hour;
-    if (reminderMinute < 0) {
-      reminderMinute += 60;
-      reminderHour -= 1;
-    }
-    if (reminderHour < 0) return;
-
     final now = tz.TZDateTime.now(tz.local);
-    var scheduledDate = _nextInstanceOfWeekdayTime(day, reminderHour, reminderMinute);
+    var scheduledDate = _nextInstanceOfWeekdayTime(day, hour, minute);
+
+    // Hitung waktu pengingat dengan mengurangi menit yang ditentukan
+    scheduledDate = scheduledDate.subtract(Duration(minutes: jadwal.pengingatMenit));
 
     if (scheduledDate.isBefore(now)) {
       scheduledDate = scheduledDate.add(const Duration(days: 7));
     }
 
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+    final String waktuDesc = jadwal.pengingatMenit == 0
+        ? 'tepat waktu'
+        : (jadwal.pengingatMenit == 60 ? '1 jam sebelumnya' : '${jadwal.pengingatMenit} menit sebelumnya');
+
+    final String waktuText = jadwal.pengingatMenit == 0
+        ? 'sekarang'
+        : (jadwal.pengingatMenit == 60 ? '1 jam lagi' : '${jadwal.pengingatMenit} menit lagi');
+
+    final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'jadwalku_channel',
       'Pengingat Jadwal Kuliah',
-      channelDescription: 'Notifikasi pengingat jadwal kuliah 15 menit sebelumnya',
+      channelDescription: 'Notifikasi pengingat jadwal kuliah $waktuDesc',
       importance: Importance.high,
       priority: Priority.high,
       icon: '@mipmap/ic_launcher',
-      color: Color(0xFF6C63FF),
+      color: const Color(0xFF6C63FF),
     );
 
-    const NotificationDetails notifDetails = NotificationDetails(
+    final NotificationDetails notifDetails = NotificationDetails(
       android: androidDetails,
     );
 
     await _notificationsPlugin.zonedSchedule(
       jadwal.id!,
       '🎓 ${jadwal.mataKuliah}',
-      'Kuliah ${jadwal.mataKuliah} dimulai 15 menit lagi di ${jadwal.ruangan}',
+      'Kuliah ${jadwal.mataKuliah} dimulai $waktuText di ${jadwal.ruangan}',
       scheduledDate,
       notifDetails,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
