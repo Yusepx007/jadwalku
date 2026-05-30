@@ -63,17 +63,25 @@ class NotificationHelper {
         : (jadwal.pengingatMenit == 60 ? '1 jam lagi' : '${jadwal.pengingatMenit} menit lagi');
 
     final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'jadwalku_channel',
+      'jadwalku_channel_custom_sound',
       'Pengingat Jadwal Kuliah',
       channelDescription: 'Notifikasi pengingat jadwal kuliah $waktuDesc',
       importance: Importance.high,
       priority: Priority.high,
       icon: '@mipmap/ic_launcher',
       color: const Color(0xFF6C63FF),
+      sound: const RawResourceAndroidNotificationSound('custom_alarm'),
+      playSound: true,
+    );
+
+    final DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
+      presentSound: true,
+      sound: 'custom_alarm.wav',
     );
 
     final NotificationDetails notifDetails = NotificationDetails(
       android: androidDetails,
+      iOS: iosDetails,
     );
 
     await _notificationsPlugin.zonedSchedule(
