@@ -23,13 +23,38 @@ class NotificationHelper {
       initSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {},
     );
+
+    // Buat Notification Channel secara eksplisit dengan suara alarm kustom
+    final androidPlugin = _notificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin != null) {
+      const AndroidNotificationChannel channel = AndroidNotificationChannel(
+        'jadwalku_alarm_channel_v2', // Menggunakan ID baru untuk mereset konfigurasi lama
+        'Pengingat Jadwal Kuliah',
+        description: 'Notifikasi pengingat jadwal kuliah dengan suara alarm kustom',
+        importance: Importance.max, // Penting untuk memicu banner popup heads-up
+        playSound: true,
+        sound: RawResourceAndroidNotificationSound('custom_alarm'),
+      );
+      await androidPlugin.createNotificationChannel(channel);
+    }
   }
 
   static Future<void> requestPermission() async {
-    await _notificationsPlugin
+    final androidPlugin = _notificationsPlugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.requestNotificationsPermission();
+            AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin != null) {
+      // Minta izin POST_NOTIFICATIONS untuk Android 13+
+      await androidPlugin.requestNotificationsPermission();
+      // Minta izin SCHEDULE_EXACT_ALARM untuk Android 13/14+
+      try {
+        await androidPlugin.requestExactAlarmsPermission();
+      } catch (e) {
+        debugPrint('Gagal meminta izin exact alarm: $e');
+      }
+    }
   }
 
   static Future<void> scheduleWeeklyNotification(Jadwal jadwal) async {
@@ -63,10 +88,10 @@ class NotificationHelper {
         : (jadwal.pengingatMenit == 60 ? '1 jam lagi' : '${jadwal.pengingatMenit} menit lagi');
 
     final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'jadwalku_channel_custom_sound',
+      'jadwalku_alarm_channel_v2', // Harus cocok dengan ID channel yang dibuat eksplisit
       'Pengingat Jadwal Kuliah',
       channelDescription: 'Notifikasi pengingat jadwal kuliah $waktuDesc',
-      importance: Importance.high,
+      importance: Importance.max,
       priority: Priority.high,
       icon: '@mipmap/ic_launcher',
       color: const Color(0xFF6C63FF),
@@ -84,16 +109,67 @@ class NotificationHelper {
       iOS: iosDetails,
     );
 
-    await _notificationsPlugin.zonedSchedule(
-      jadwal.id!,
-      '🎓 ${jadwal.mataKuliah}',
-      'Kuliah ${jadwal.mataKuliah} dimulai $waktuText di ${jadwal.ruangan}',
-      scheduledDate,
+    try {
+      await _notificationsPlugin.zonedSchedule(
+        jadwal.id!,
+        '🎓 ${jadwal.mataKuliah}',
+        'Kuliah ${jadwal.mataKuliah} dimulai $waktuText di ${jadwal.ruangan}',
+        scheduledDate,
+        notifDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+      debugPrint('Berhasil menjadwalkan notifikasi presisi untuk ${jadwal.mataKuliah} pada $scheduledDate');
+    } catch (e) {
+      debugPrint('Gagal menjadwalkan alarm presisi: $e. Mencoba fallback dengan inexactAllowWhileIdle.');
+      // Fallback jika exact alarm diblokir/gagal
+      try {
+        await _notificationsPlugin.zonedSchedule(
+          jadwal.id!,
+          '🎓 ${jadwal.mataKuliah}',
+          'Kuliah ${jadwal.mataKuliah} dimulai $waktuText di ${jadwal.ruangan}',
+          scheduledDate,
+          notifDetails,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+        );
+        debugPrint('Berhasil menjadwalkan notifikasi fallback (inexact) untuk ${jadwal.mataKuliah}');
+      } catch (err) {
+        debugPrint('Gagal total menjadwalkan notifikasi fallback: $err');
+      }
+    }
+  }
+
+  static Future<void> showTestNotification() async {
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'jadwalku_alarm_channel_v2',
+      'Pengingat Jadwal Kuliah',
+      channelDescription: 'Channel untuk notifikasi alarm pengingat jadwal kuliah',
+      importance: Importance.max,
+      priority: Priority.high,
+      icon: '@mipmap/ic_launcher',
+      color: Color(0xFF6C63FF),
+      sound: RawResourceAndroidNotificationSound('custom_alarm'),
+      playSound: true,
+    );
+
+    const NotificationDetails notifDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: DarwinNotificationDetails(
+        presentSound: true,
+        sound: 'custom_alarm.wav',
+      ),
+    );
+
+    await _notificationsPlugin.show(
+      9999, // ID unik tes
+      '🔔 Tes Notifikasi JadwalKu',
+      'Ini adalah notifikasi uji coba dengan suara alarm kustom!',
       notifDetails,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
     );
   }
 

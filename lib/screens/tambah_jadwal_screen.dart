@@ -737,6 +737,49 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
             ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(
+                onPressed: () async {
+                  await NotificationHelper.showTestNotification();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Row(
+                          children: [
+                            const Icon(Icons.check_circle_rounded, color: Colors.black, size: 18),
+                            const SizedBox(width: 8),
+                            Text('Mengirimkan notifikasi tes...',
+                                style: GoogleFonts.poppins(color: Colors.black, fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                        backgroundColor: AppColors.primary,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.play_circle_filled_rounded, size: 18, color: AppColors.primary),
+                label: Text(
+                  'Uji Coba Notifikasi (Kirim Sekarang)',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  backgroundColor: AppColors.primary.withAlpha(20),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
           ],
         ],
       ),
