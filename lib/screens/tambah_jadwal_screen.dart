@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../database/database_helper.dart';
 import '../models/jadwal_model.dart';
 import '../utils/constants.dart';
@@ -742,6 +743,66 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
               width: double.infinity,
               child: TextButton.icon(
                 onPressed: () async {
+                  final isNotifGranted = await NotificationHelper.isNotificationPermissionGranted();
+                  if (!isNotifGranted) {
+                    if (mounted) {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          backgroundColor: AppColors.bgCard,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            side: BorderSide(color: AppColors.primary.withAlpha(40)),
+                          ),
+                          title: Text(
+                            'Izin Notifikasi Nonaktif',
+                            style: GoogleFonts.poppins(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          content: Text(
+                            'Anda tidak dapat mengirimkan notifikasi uji coba karena izin notifikasi dinonaktifkan di pengaturan sistem.',
+                            style: GoogleFonts.poppins(
+                              color: AppColors.textSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: Text(
+                                'Batal',
+                                style: GoogleFonts.poppins(color: AppColors.textSecondary),
+                              ),
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                openAppSettings();
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: Text(
+                                'Buka Pengaturan',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    return;
+                  }
+
                   await NotificationHelper.showTestNotification();
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(

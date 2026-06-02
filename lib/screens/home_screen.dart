@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../database/database_helper.dart';
 import '../models/jadwal_model.dart';
 import '../utils/constants.dart';
@@ -17,19 +18,22 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final DatabaseHelper _db = DatabaseHelper();
   List<Jadwal> _allJadwal = [];
   List<Jadwal> _filteredJadwal = [];
   String _selectedHari = 'Semua';
   late TabController _tabController;
   bool _isLoading = true;
+  bool _isNotificationGranted = true;
+  bool _isExactAlarmGranted = true;
 
   final List<String> _tabs = ['Semua', ...AppConstants.hariList];
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,
@@ -37,6 +41,7 @@ class _HomeScreenState extends State<HomeScreen>
     _tabController = TabController(length: _tabs.length, vsync: this);
     _tabController.addListener(_onTabChanged);
     _loadJadwal();
+    _checkPermissions();
 
     final today = AppConstants.getDayOfWeekName();
     final idx = _tabs.indexOf(today);
@@ -112,9 +117,28 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkPermissions();
+    }
+  }
+
+  Future<void> _checkPermissions() async {
+    final hasNotif = await NotificationHelper.isNotificationPermissionGranted();
+    final hasExact = await NotificationHelper.isExactAlarmPermissionGranted();
+    if (mounted) {
+      setState(() {
+        _isNotificationGranted = hasNotif;
+        _isExactAlarmGranted = hasExact;
+      });
+    }
   }
 
   String _getGreeting() {
@@ -136,6 +160,7 @@ class _HomeScreenState extends State<HomeScreen>
               _buildHeader(),
               const SizedBox(height: 4),
               _buildStatsRow(),
+              _buildPermissionWarning(),
               const SizedBox(height: 4),
               _buildTabBar(),
               Expanded(
@@ -155,6 +180,137 @@ class _HomeScreenState extends State<HomeScreen>
         ),
       ),
       floatingActionButton: _buildFAB(),
+    );
+  }
+
+  Widget _buildPermissionWarning() {
+    if (_isNotificationGranted && _isExactAlarmGranted) {
+      return const SizedBox.shrink();
+    }
+
+    final isNotifDenied = !_isNotificationGranted;
+    
+    final gradient = isNotifDenied
+        ? const LinearGradient(
+            colors: [Color(0xFF3B1E1E), Color(0xFF2D1818)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          )
+        : const LinearGradient(
+            colors: [Color(0xFF3B2F1E), Color(0xFF2D2518)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          );
+
+    final borderColor = isNotifDenied
+        ? const Color(0xFFEF4444).withAlpha(120)
+        : const Color(0xFFF59E0B).withAlpha(120);
+
+    final iconColor = isNotifDenied ? const Color(0xFFEF4444) : const Color(0xFFF59E0B);
+    
+    final icon = isNotifDenied
+        ? Icons.notifications_off_rounded
+        : Icons.alarm_off_rounded;
+
+    final title = isNotifDenied
+        ? 'Izin Notifikasi Nonaktif'
+        : 'Alarm Presisi Nonaktif';
+
+    final description = isNotifDenied
+        ? 'Aplikasi tidak dapat mengirimkan pengingat jadwal kuliah karena izin notifikasi dinonaktifkan.'
+        : 'Pengingat mungkin terlambat/tidak tepat waktu karena izin alarm presisi dinonaktifkan.';
+
+    final buttonText = isNotifDenied ? 'Aktifkan Izin' : 'Aktifkan Alarm';
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: borderColor, width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: iconColor.withAlpha(20),
+            blurRadius: 16,
+            spreadRadius: 1,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: iconColor.withAlpha(25),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: iconColor, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: GoogleFonts.poppins(
+                    fontSize: 11.5,
+                    color: AppColors.textSecondary,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                InkWell(
+                  onTap: () async {
+                    if (isNotifDenied) {
+                      await openAppSettings();
+                    } else {
+                      await NotificationHelper.requestPermission();
+                      await _checkPermissions();
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: iconColor.withAlpha(35),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: iconColor.withAlpha(100), width: 1),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          buttonText,
+                          style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: iconColor,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(Icons.arrow_forward_ios_rounded, size: 9, color: iconColor),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

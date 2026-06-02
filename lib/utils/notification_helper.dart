@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
+import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../models/jadwal_model.dart';
 
 class NotificationHelper {
@@ -10,7 +12,15 @@ class NotificationHelper {
 
   static Future<void> initialize() async {
     tz.initializeTimeZones();
-    tz.setLocalLocation(tz.getLocation('Asia/Jakarta'));
+    String timeZoneName;
+    try {
+      timeZoneName = await FlutterTimezone.getLocalTimezone();
+      debugPrint('Berhasil mendeteksi zona waktu lokal: $timeZoneName');
+    } catch (e) {
+      debugPrint('Gagal mendeteksi zona waktu lokal, fallback ke Asia/Jakarta: $e');
+      timeZoneName = 'Asia/Jakarta';
+    }
+    tz.setLocalLocation(tz.getLocation(timeZoneName));
 
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -179,6 +189,16 @@ class NotificationHelper {
 
   static Future<void> cancelAllNotifications() async {
     await _notificationsPlugin.cancelAll();
+  }
+
+  // Cek apakah izin notifikasi aktif di sistem
+  static Future<bool> isNotificationPermissionGranted() async {
+    return await Permission.notification.isGranted;
+  }
+
+  // Cek apakah izin alarm presisi aktif di sistem (untuk Android 13+)
+  static Future<bool> isExactAlarmPermissionGranted() async {
+    return await Permission.scheduleExactAlarm.isGranted;
   }
 
   static int? _getDayOfWeek(String hari) {
