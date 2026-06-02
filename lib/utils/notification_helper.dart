@@ -14,7 +14,8 @@ class NotificationHelper {
     tz.initializeTimeZones();
     String timeZoneName;
     try {
-      timeZoneName = await FlutterTimezone.getLocalTimezone();
+      final timezoneInfo = await FlutterTimezone.getLocalTimezone();
+      timeZoneName = timezoneInfo.identifier;
       debugPrint('Berhasil mendeteksi zona waktu lokal: $timeZoneName');
     } catch (e) {
       debugPrint('Gagal mendeteksi zona waktu lokal, fallback ke Asia/Jakarta: $e');
