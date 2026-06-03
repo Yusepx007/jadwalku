@@ -14,6 +14,7 @@ class NotificationHelper {
     tz.initializeTimeZones();
     String timeZoneName;
     try {
+      // FlutterTimezone v5 mengembalikan TimezoneInfo object, ambil .identifier
       final timezoneInfo = await FlutterTimezone.getLocalTimezone();
       timeZoneName = timezoneInfo.identifier;
       debugPrint('Berhasil mendeteksi zona waktu lokal: $timeZoneName');
@@ -41,12 +42,14 @@ class NotificationHelper {
             AndroidFlutterLocalNotificationsPlugin>();
     if (androidPlugin != null) {
       const AndroidNotificationChannel channel = AndroidNotificationChannel(
-        'jadwalku_alarm_channel_v2', // Menggunakan ID baru untuk mereset konfigurasi lama
+        'jadwalku_alarm_channel_v3',
         'Pengingat Jadwal Kuliah',
-        description: 'Notifikasi pengingat jadwal kuliah dengan suara alarm kustom',
-        importance: Importance.max, // Penting untuk memicu banner popup heads-up
+        description: 'Notifikasi pengingat jadwal kuliah',
+        importance: Importance.max,
         playSound: true,
         sound: RawResourceAndroidNotificationSound('custom_alarm'),
+        enableVibration: true,
+        showBadge: true,
       );
       await androidPlugin.createNotificationChannel(channel);
     }
@@ -57,14 +60,9 @@ class NotificationHelper {
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
     if (androidPlugin != null) {
-      // Minta izin POST_NOTIFICATIONS untuk Android 13+
+      // Hanya minta izin POST_NOTIFICATIONS untuk Android 13+
+      // Tidak perlu minta SCHEDULE_EXACT_ALARM karena kita pakai alarmClock mode
       await androidPlugin.requestNotificationsPermission();
-      // Minta izin SCHEDULE_EXACT_ALARM untuk Android 13/14+
-      try {
-        await androidPlugin.requestExactAlarmsPermission();
-      } catch (e) {
-        debugPrint('Gagal meminta izin exact alarm: $e');
-      }
     }
   }
 
@@ -99,7 +97,7 @@ class NotificationHelper {
         : (jadwal.pengingatMenit == 60 ? '1 jam lagi' : '${jadwal.pengingatMenit} menit lagi');
 
     final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'jadwalku_alarm_channel_v2', // Harus cocok dengan ID channel yang dibuat eksplisit
+      'jadwalku_alarm_channel_v3',
       'Pengingat Jadwal Kuliah',
       channelDescription: 'Notifikasi pengingat jadwal kuliah $waktuDesc',
       importance: Importance.max,
@@ -108,6 +106,11 @@ class NotificationHelper {
       color: const Color(0xFF6C63FF),
       sound: const RawResourceAndroidNotificationSound('custom_alarm'),
       playSound: true,
+      enableVibration: true,
+      // Tampilkan notifikasi meski layar mati
+      fullScreenIntent: true,
+      // Munculkan sebagai heads-up notification
+      category: AndroidNotificationCategory.alarm,
     );
 
     final DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
@@ -121,43 +124,30 @@ class NotificationHelper {
     );
 
     try {
+      // Gunakan alarmClock mode:
+      // - Tidak butuh izin SCHEDULE_EXACT_ALARM (tanpa opsi pengembang)
+      // - Tetap jalan saat HP idle / layar mati (tidak diblokir Doze Mode)
+      // - Presisi tepat waktu seperti alarm jam
       await _notificationsPlugin.zonedSchedule(
         jadwal.id!,
         '🎓 ${jadwal.mataKuliah}',
         'Kuliah ${jadwal.mataKuliah} dimulai $waktuText di ${jadwal.ruangan}',
         scheduledDate,
         notifDetails,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        androidScheduleMode: AndroidScheduleMode.alarmClock,
         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
       );
-      debugPrint('Berhasil menjadwalkan notifikasi presisi untuk ${jadwal.mataKuliah} pada $scheduledDate');
+      debugPrint('Berhasil menjadwalkan notifikasi (alarmClock) untuk ${jadwal.mataKuliah} pada $scheduledDate');
     } catch (e) {
-      debugPrint('Gagal menjadwalkan alarm presisi: $e. Mencoba fallback dengan inexactAllowWhileIdle.');
-      // Fallback jika exact alarm diblokir/gagal
-      try {
-        await _notificationsPlugin.zonedSchedule(
-          jadwal.id!,
-          '🎓 ${jadwal.mataKuliah}',
-          'Kuliah ${jadwal.mataKuliah} dimulai $waktuText di ${jadwal.ruangan}',
-          scheduledDate,
-          notifDetails,
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-        );
-        debugPrint('Berhasil menjadwalkan notifikasi fallback (inexact) untuk ${jadwal.mataKuliah}');
-      } catch (err) {
-        debugPrint('Gagal total menjadwalkan notifikasi fallback: $err');
-      }
+      debugPrint('Gagal menjadwalkan notifikasi: $e');
     }
   }
 
   static Future<void> showTestNotification() async {
     const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'jadwalku_alarm_channel_v2',
+      'jadwalku_alarm_channel_v3',
       'Pengingat Jadwal Kuliah',
       channelDescription: 'Channel untuk notifikasi alarm pengingat jadwal kuliah',
       importance: Importance.max,
@@ -166,6 +156,9 @@ class NotificationHelper {
       color: Color(0xFF6C63FF),
       sound: RawResourceAndroidNotificationSound('custom_alarm'),
       playSound: true,
+      enableVibration: true,
+      fullScreenIntent: true,
+      category: AndroidNotificationCategory.alarm,
     );
 
     const NotificationDetails notifDetails = NotificationDetails(
@@ -195,11 +188,6 @@ class NotificationHelper {
   // Cek apakah izin notifikasi aktif di sistem
   static Future<bool> isNotificationPermissionGranted() async {
     return await Permission.notification.isGranted;
-  }
-
-  // Cek apakah izin alarm presisi aktif di sistem (untuk Android 13+)
-  static Future<bool> isExactAlarmPermissionGranted() async {
-    return await Permission.scheduleExactAlarm.isGranted;
   }
 
   static int? _getDayOfWeek(String hari) {

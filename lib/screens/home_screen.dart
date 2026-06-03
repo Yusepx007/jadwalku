@@ -26,7 +26,6 @@ class _HomeScreenState extends State<HomeScreen>
   late TabController _tabController;
   bool _isLoading = true;
   bool _isNotificationGranted = true;
-  bool _isExactAlarmGranted = true;
 
   final List<String> _tabs = ['Semua', ...AppConstants.hariList];
 
@@ -132,11 +131,9 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> _checkPermissions() async {
     final hasNotif = await NotificationHelper.isNotificationPermissionGranted();
-    final hasExact = await NotificationHelper.isExactAlarmPermissionGranted();
     if (mounted) {
       setState(() {
         _isNotificationGranted = hasNotif;
-        _isExactAlarmGranted = hasExact;
       });
     }
   }
@@ -184,51 +181,23 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildPermissionWarning() {
-    if (_isNotificationGranted && _isExactAlarmGranted) {
+    if (_isNotificationGranted) {
       return const SizedBox.shrink();
     }
 
-    final isNotifDenied = !_isNotificationGranted;
-    
-    final gradient = isNotifDenied
-        ? const LinearGradient(
-            colors: [Color(0xFF3B1E1E), Color(0xFF2D1818)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          )
-        : const LinearGradient(
-            colors: [Color(0xFF3B2F1E), Color(0xFF2D2518)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          );
-
-    final borderColor = isNotifDenied
-        ? const Color(0xFFEF4444).withAlpha(120)
-        : const Color(0xFFF59E0B).withAlpha(120);
-
-    final iconColor = isNotifDenied ? const Color(0xFFEF4444) : const Color(0xFFF59E0B);
-    
-    final icon = isNotifDenied
-        ? Icons.notifications_off_rounded
-        : Icons.alarm_off_rounded;
-
-    final title = isNotifDenied
-        ? 'Izin Notifikasi Nonaktif'
-        : 'Alarm Presisi Nonaktif';
-
-    final description = isNotifDenied
-        ? 'Aplikasi tidak dapat mengirimkan pengingat jadwal kuliah karena izin notifikasi dinonaktifkan.'
-        : 'Pengingat mungkin terlambat/tidak tepat waktu karena izin alarm presisi dinonaktifkan.';
-
-    final buttonText = isNotifDenied ? 'Aktifkan Izin' : 'Aktifkan Alarm';
+    const iconColor = Color(0xFFEF4444);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: gradient,
+        gradient: const LinearGradient(
+          colors: [Color(0xFF3B1E1E), Color(0xFF2D1818)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: borderColor, width: 1.2),
+        border: Border.all(color: iconColor.withAlpha(120), width: 1.2),
         boxShadow: [
           BoxShadow(
             color: iconColor.withAlpha(20),
@@ -247,7 +216,7 @@ class _HomeScreenState extends State<HomeScreen>
               color: iconColor.withAlpha(25),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(icon, color: iconColor, size: 24),
+            child: const Icon(Icons.notifications_off_rounded, color: iconColor, size: 24),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -255,7 +224,7 @@ class _HomeScreenState extends State<HomeScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  'Izin Notifikasi Nonaktif',
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
@@ -264,7 +233,7 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  description,
+                  'Aplikasi tidak dapat mengirimkan pengingat jadwal kuliah karena izin notifikasi dinonaktifkan.',
                   style: GoogleFonts.poppins(
                     fontSize: 11.5,
                     color: AppColors.textSecondary,
@@ -274,12 +243,7 @@ class _HomeScreenState extends State<HomeScreen>
                 const SizedBox(height: 12),
                 InkWell(
                   onTap: () async {
-                    if (isNotifDenied) {
-                      await openAppSettings();
-                    } else {
-                      await NotificationHelper.requestPermission();
-                      await _checkPermissions();
-                    }
+                    await openAppSettings();
                   },
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
@@ -293,7 +257,7 @@ class _HomeScreenState extends State<HomeScreen>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          buttonText,
+                          'Aktifkan Izin',
                           style: GoogleFonts.poppins(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
@@ -301,7 +265,7 @@ class _HomeScreenState extends State<HomeScreen>
                           ),
                         ),
                         const SizedBox(width: 4),
-                        Icon(Icons.arrow_forward_ios_rounded, size: 9, color: iconColor),
+                        const Icon(Icons.arrow_forward_ios_rounded, size: 9, color: iconColor),
                       ],
                     ),
                   ),
